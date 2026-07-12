@@ -1,0 +1,98 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: quant_postgres
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_DB: ${DB_NAME:-quant_eod}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./sql/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./sql/schema_phase2.sql:/docker-entrypoint-initdb.d/02-schema-phase2.sql
+      - ./sql/schema_migration_yield_spread.sql:/docker-entrypoint-initdb.d/03-migration-yield-spread.sql
+      - ./sql/schema_physics.sql:/docker-entrypoint-initdb.d/04-schema-physics.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d quant_eod"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: quant_redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+#  oanda-streamer:
+#    build:
+#      context: .
+#      dockerfile: Dockerfile
+#    container_name: oanda_streamer
+#    command: ["python", "fetchers/oanda_stream.py"]
+#    restart: always
+#    depends_on:
+#      redis:
+#        condition: service_healthy
+#    env_file: .env
+#    environment:
+#      - DB_HOST=postgres
+#      - REDIS_HOST=redis
+#      - PYTHONPATH=/app
+#    volumes:
+#      - ./logs:/app/logs
+
+  physics-engine:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: physics_engine
+    command: ["python", "physics/worker.py"]
+    restart: always
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      - DB_HOST=postgres
+      - REDIS_HOST=redis
+      - PYTHONPATH=/app
+    volumes:
+      - ./logs:/app/logs
+      - ./model_artifacts:/app/model_artifacts
+
+  live-trader:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: live_trader
+    command: ["python", "execution/live_trader.py"]
+    restart: always
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      - DB_HOST=postgres
+      - REDIS_HOST=redis
+      - PYTHONPATH=/app
+    volumes:
+      - ./logs:/app/logs
+      - ./model_artifacts:/app/model_artifacts
+
+volumes:
+  pgdata:

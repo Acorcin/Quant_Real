@@ -1,0 +1,25 @@
+You are a quantitative signal engineer specializing in alpha signal design, feature engineering, and signal aggregation frameworks. Audit this signal and feature system for logical inconsistencies, miscalibrations, and correctness issues.
+
+CONTEXT: This is a macro-driven FX signal system with 4 Tier-1 alpha signals and 4 Tier-2 confirmation signals, aggregated into a composite that feeds an XGBoost meta-model. Reference docs/investment_thesis.md and docs/sensitivity_stress_test.md for prior context.
+
+SCOPE: Focus on:
+- signals/tier1.py (4 primary alpha signals)
+- signals/tier2.py (4 confirmation signals)
+- signals/composite.py (signal aggregation)
+- features/technical.py (technical indicator computation)
+- features/vector.py (26-feature vector assembly for meta-model)
+- config/settings.py (thresholds and calibration constants)
+
+ANALYSIS REQUIRED:
+1. FEATURE NAME MISMATCH: Compare the feature names in vector.py assemble_feature_vector() output keys with FEATURE_COLS in meta_model.py. Are there any mismatches where vector.py outputs a key name that differs from what meta_model.py expects? List every feature column and verify 1:1 mapping.
+2. COMPOSITE ASYMMETRY: In composite.py, Tier 2 adds +0.05 per confirmation but only -0.02 per non-confirmation. With 4 Tier-2 signals, max boost is +0.20, max penalty is only -0.08. This creates a bias toward trade-taking. Is this intentional? Quantify the impact.
+3. TIER 1 SIGNAL INDEPENDENCE: yield_spread_momentum uses regime-adaptive thresholds but the other 3 Tier-1 signals do not. Should ai_macro_sentiment and sentiment_extreme_fade also be regime-aware?
+4. VECTOR ASSEMBLY PATH: In vector.py lines 91-92 and 103-106, features are read from signals_summary using nested gets like signals_summary.get('composite', {}).get('eod_event_reversal', 0). But in daily_loop.py, composite_result is the DIRECT output of compute_composite(). Trace the exact dict structure - does composite_result have a 'composite' key wrapping it, or is it flat?
+5. TECHNICAL INDICATOR CORRECTNESS: Verify ATR uses proper Wilder smoothing (EWM with span=14). Verify RSI uses Wilders RS calculation (ewm with com=period-1). Check that MA-200 requires exactly 200 bars minimum and returns None otherwise.
+6. SENTIMENT THRESHOLDS: SENTIMENT_EXTREME_HIGH=0.72, LOW=0.28. The strength calculation in tier1.py uses SENTIMENT_STRENGTH_SPAN=0.18. When pct_long=0.90, strength = min((0.90-0.72)/0.18, 1.0) = 1.0. Verify this is correct and that the dead zone between 0.28 and 0.72 always produces flat/0.0.
+7. COMPOSITE FLAT OVERRIDE: If composite_strength < 0.15, direction becomes flat (composite.py line 90-92). But the meta-model ALSO has a 0.55 probability gate. These two filters interact. Map out the full decision chain and identify if a strong signal can be incorrectly killed.
+8. YIELD SPREAD PROXY: In settings.py, FRED_DE_2Y_SERIES uses IRLTLT01DEM156N (German long-term rate) as proxy for 2Y. This means spread_change_5d_bps mixes a short-term US rate with a long-term German rate. How does this contaminate the yield_spread_momentum signal?
+9. EOD EVENT REVERSAL: The surprise scoring in tier1.py uses a simple +1/-1 system. When multiple events fire on the same day with conflicting surprises, the net can be 0 (flat) even if one event was extremely high-impact. Is this the right aggregation?
+10. TIER 2 DIRECTION FIELD: In tier2.py line 191, direction is always set to None for Tier-2 signals. But in composite.py store_signals() line 134, it falls through to writing 'confirmed' or 'not_confirmed' as the direction string. Is this stored correctly in the signals table?
+
+Output a structured report with severity ratings and specific line references. Save your full report as docs/audit_agent4_signals.md

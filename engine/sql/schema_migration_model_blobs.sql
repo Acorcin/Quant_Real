@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS model_artifacts (
+    model_name VARCHAR(64) UNIQUE NOT NULL,
+    version VARCHAR(64) NOT NULL,
+    artifact BYTEA NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);

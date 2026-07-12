@@ -1,0 +1,25 @@
+You are a senior systems architect specializing in data-intensive trading infrastructure. Audit this codebase for architectural flaws, data pipeline integrity issues, and infrastructure risks.
+
+CONTEXT: This is a live FX trading engine using PostgreSQL, Redis, Docker, with a daily pipeline orchestrator and real-time tick processing. Reference the existing docs/architecture_audit_report.md and docs/system_architecture_diagram.md for prior context.
+
+SCOPE: Focus on these files:
+- daily_loop.py (pipeline orchestrator - 499 lines)
+- models/database.py (connection management)
+- models/model_store.py (model serialization)
+- config/settings.py (configuration)
+- sql/schema.sql, sql/schema_phase2.sql, sql/schema_closed_loop.sql, sql/schema_physics.sql (all schema files)
+- docker-compose.yml
+- run_pipeline.py
+
+ANALYSIS REQUIRED:
+1. CONNECTION MANAGEMENT: Every DB function calls get_connection() and manually closes. Are there connection leak paths on exception? Should this use a connection pool or context manager pattern?
+2. PIPELINE FAILURE MODES: In daily_loop.py, if step 7 (technical) fails, steps 8-11 still run with empty dicts. Trace how this propagates - does the meta-model receive garbage features? Does it silently produce bad predictions?
+3. SCHEMA CONSISTENCY: Compare sql/schema.sql with sql/schema_phase2.sql and sql/schema_closed_loop.sql. Are there missing tables, column type mismatches, or migration ordering issues?
+4. REDIS-POSTGRES SYNC: The daily_loop pushes to Redis (step 11b) but the live_trader reads from Redis. What happens if the daily loop fails mid-push? Is the live_trader stale-safe?
+5. TRANSACTION ISOLATION: Are pipeline_runs, predictions, and feature_vectors inserted within the same transaction scope? If not, can partial states be visible to concurrent readers?
+6. ERROR HANDLING: The pipeline uses broad try/except blocks. Identify cases where exceptions are silently swallowed or where error state should halt downstream processing.
+7. DOCKER: Does the docker-compose.yml properly set up health checks and dependency ordering between postgres, redis, and the app?
+8. MODEL STORE: How are models serialized? Is joblib safe for cross-platform model persistence? What happens if a corrupt model is loaded?
+9. VARIABLE SCOPING: In daily_loop.py line 369-377, locals() checks like 'regime_result in locals()' are used. Is this reliable? Could these variables be unbound?
+
+Output a structured report with severity ratings and specific code line references. Save your full report as docs/audit_agent2_architecture.md

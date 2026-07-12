@@ -1,0 +1,23 @@
+You are a quantitative finance auditor specializing in systematic trading strategy validation. Analyze this codebase for statistical and methodological flaws in the quantitative strategy.
+
+CONTEXT: This is a live FX trading engine (EUR/USD) using an EOD macro-driven signal system with XGBoost meta-labeling, HMM regime detection, and CPCV validation. Reference the existing docs/ directory for prior audit context.
+
+SCOPE: Focus exclusively on these files:
+- models/meta_model.py (XGBoost meta-model, CPCV, PSR, label generation)
+- models/hmm_regime.py (HMM regime detection)
+- walkforward_test.py (walk-forward backtest methodology)
+- backtest_loop.py (backtesting engine)
+- generate_historical_features.py (historical feature generation)
+- docs/math_model_spec.md and docs/backtest_report.md (prior documentation)
+
+ANALYSIS REQUIRED:
+1. LOOK-AHEAD BIAS: Trace the exact label generation path in train_from_db(). The label uses open-to-close returns on T+1, but _next_trading_day_pct_returns() uses close-to-close. Is there an inconsistency? Does either leak future data?
+2. CPCV VALIDATION: Are the purge=5 and embargo=2 parameters sufficient for daily-frequency data? Is the CPCV return simulation (line 464-471) methodologically sound? The return calculation uses signals * (2*y_test - 1) * abs(r_next) which mixes label knowledge with returns.
+3. PSR FORMULA: Verify the _probabilistic_sharpe_ratio_from_returns() implementation against Bailey and Lopez de Prado (AFML Ch. 14). Check the variance-of-SR formula for correctness including skew and kurtosis terms.
+4. OVERFITTING: The final model trains on ALL data after CPCV (line 272). Is this appropriate? Does the walk-forward test properly respect time-series ordering?
+5. FEATURE LEAKAGE: Does the feature vector assembly at prediction time use any data that would not be available at 5:15 PM ET on trade date?
+6. HMM STATE STABILITY: The HMM re-fits daily on 504 bars. State-flip detection exists but only warns. Can flipped labels corrupt downstream regime-conditioned signals?
+7. STATISTICAL TESTS: Is the one-sample t-test on path Sharpes (line 490) the right test? Should they use a bootstrapped distribution instead?
+8. CPCV GPU PROBE: _get_xgb_device() is called INSIDE every CPCV fold (line 458), doing a full GPU probe each time. Is this a performance bottleneck?
+
+Output a structured report with severity ratings (CRITICAL / HIGH / MEDIUM / LOW) for each finding, specific line references, and concrete fix suggestions. Save your full report as docs/audit_agent1_quant_strategy.md

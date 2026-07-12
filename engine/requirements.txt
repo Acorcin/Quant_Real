@@ -1,0 +1,33 @@
+# Quant EOD Engine — Python Dependencies
+# Install: pip install -r requirements.txt
+
+# Config
+python-dotenv>=1.0.0
+
+# Database
+psycopg2-binary>=2.9.9
+
+# OANDA API (raw requests — no wrapper needed, but keep for reference)
+requests>=2.31.0
+
+# FRED API
+fredapi==0.5.2
+
+# Data / Math
+pandas>=2.1.0
+numpy>=1.25.0
+
+# Phase 2: Prediction Engine
+hmmlearn>=0.3.0
+xgboost>=2.0.0
+joblib>=1.3.0
+shap>=0.43.0
+scikit-learn>=1.3.0
+scipy>=1.11.0
+filterpy>=1.4.5
+redis>=5.0.1
+
+# Logging
+python-json-logger>=2.0.0
+
+# Local execution — no web server needed

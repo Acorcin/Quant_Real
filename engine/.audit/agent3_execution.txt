@@ -1,0 +1,27 @@
+You are a trading systems engineer specializing in execution infrastructure and real-time risk management. Audit this live trading system for execution bugs, risk management gaps, and real-time processing issues.
+
+CONTEXT: This is a live FX trading engine consuming tick data via Redis streams, using Kalman filtering for price conditioning, and executing via OANDA API. Reference docs/risk_management_framework.md and docs/monitoring_alerting_spec.md for prior context.
+
+SCOPE: Focus exclusively on:
+- execution/live_trader.py (tick-level trading loop)
+- execution/order_manager.py (OANDA API order management)
+- execution/risk.py (position sizing, Kelly criterion, drawdown)
+- physics/engine.py (tick conditioning pipeline)
+- physics/kalman.py (Kalman filter implementation)
+- physics/worker.py (Redis stream processor)
+- physics/outlier.py (spike detection)
+
+ANALYSIS REQUIRED:
+1. PNL CALCULATION BUG: In order_manager._log_exit_to_db() line 289, pnl_amount = pnl_pips * pip_val * position_size. For EUR_USD with pip_val=0.0001, a 10-pip win on 10000 units gives 10 * 0.0001 * 10000 = 10.0. But the actual dollar P&L should be pnl_pips * 0.0001 * units = 10 * 0.0001 * 10000 = $10.00. Verify whether this formula is dimensionally correct.
+2. KELLY CRITERION: In risk.py calculate_position_size(), the formula is f* = (pR - q) / R. The default_rr is 1.5 but the actual SL=20 pips and TP=40 pips gives RR=2.0. Is this mismatch intentional?
+3. POSITION DUPLICATION: Can the live_trader open multiple positions simultaneously? What prevents re-entry while an active_trade exists in Redis but the local variable is None after a restart?
+4. VELOCITY THRESHOLDS: The entry threshold is 1.5e-6. Given EUR_USD trades at ~1.08, how does this translate to pips/second? Is this threshold meaningful for trading decisions?
+5. KALMAN STABILITY: With R=1e-3 and Q_accel=1e-5, how responsive is the filter to genuine price moves vs noise? Is the velocity estimate reliable for entry decisions at tick frequency?
+6. RACE CONDITIONS: The physics_worker saves state to Redis after processing each batch. If it crashes mid-batch, the last_processed_id may point ahead of actually processed ticks. What data is lost?
+7. SPREAD VALIDATION: validate_spread() uses pip_value=0.0001 hardcoded. This is wrong for USD_JPY where pip = 0.01. The system trades USD_JPY per settings.py INSTRUMENTS list.
+8. SL/TP FOR SHORTS: In live_trader lines 346-347, verify sl_price and tp_price are computed correctly for short positions. Also verify order_manager lines 158-162.
+9. BROKER SYNC: The modulo check on line 250 (msg_id timestamp % 100 == 0) is unreliable for rate-limiting broker queries. What is the right approach?
+10. GLOBAL STATE: live_trader.py uses module-level globals (running, redis_client, order_manager, risk_manager, active_trade). Is this safe? What happens with signal handler race conditions?
+11. DRAWDOWN CHECK: risk.py check_daily_drawdown() queries live_trades for today's realized PnL but uses CURRENT_DATE (UTC). The trading day is anchored at 5 PM ET. Could timezone mismatch cause incorrect drawdown calculations?
+
+Output a structured report with severity ratings, code line references, and concrete fix suggestions. Save your full report as docs/audit_agent3_execution.md

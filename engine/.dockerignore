@@ -1,0 +1,10 @@
+.env
+.env.*
+.git/
+.gitignore
+logs/
+model_artifacts/
+__pycache__/
+*.pyc
+README.md
+SETUP.md

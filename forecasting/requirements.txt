@@ -1,0 +1,21 @@
+# Core statistical pipeline (rungs 0-2, characterization, gate).
+numpy
+pandas
+scipy
+statsmodels
+arch          # GARCH (rung 2)
+hmmlearn      # regime models
+pyarrow       # parquet source-of-truth loader
+pytest        # tests double as instrument validation
+
+# Foundation models (rung 3). Optional: the ladder self-skips when absent.
+# CPU torch is the default wheel on Windows/macOS; on Linux use the CPU index.
+torch
+chronos-forecasting   # fallback backend
+# Primary backend is Kronos (finance-specific, not on PyPI):
+#   git clone https://github.com/shiyu-coder/Kronos vendor/Kronos
+# (repo path override: FoundationForecaster(kronos_repo=...) or KRONOS_REPO env)
+einops                # kronos deps
+huggingface_hub
+safetensors
+tqdm

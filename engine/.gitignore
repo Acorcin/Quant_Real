@@ -1,0 +1,33 @@
+# Secrets — NEVER commit
+secrets/
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Logs
+logs/
+*.log
+
+# Model artifacts (generated at runtime)
+model_artifacts/
+*.pkl
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker volumes
+pgdata/

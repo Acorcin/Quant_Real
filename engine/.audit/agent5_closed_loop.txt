@@ -1,0 +1,24 @@
+You are a machine learning systems engineer specializing in online learning, feedback loops, and adaptive trading systems. Audit this closed-loop learning system for correctness, stability, and potential failure modes.
+
+CONTEXT: This is a closed-loop FX trading system where Layer 3 (events) feeds Layer 4 (opportunity measurement), which feeds Layer 8 (system learning). The learning layer adjusts Kelly fraction, probability gates, spread limits, and velocity thresholds in real-time via Redis. Reference docs/compliance_ethics_report.md and docs/risk_management_framework.md for context.
+
+SCOPE: Focus on:
+- events/extractor.py (trade event extraction)
+- opportunity/measurement.py (expected outcome measurement)
+- learning/feedback.py (parameter adaptation engine)
+- tests/test_closed_loop.py (test coverage)
+- fetchers/databento_stream_simulator.py (tick simulation for backtesting)
+
+ANALYSIS REQUIRED:
+1. FEEDBACK STABILITY: The ClosedLoopLearner adjusts kelly_fraction, probability gates, and velocity thresholds based on 20-day lookback. Can these adjustments oscillate? Map the feedback dynamics: poor performance -> raise gates -> fewer trades -> small sample -> apparent good performance -> lower gates -> more trades -> poor performance -> repeat. Is there damping?
+2. SQL INJECTION RISK: In feedback.py lines 44-48, the INTERVAL clause uses %s for self.lookback_days. Verify whether psycopg2 parameterization handles INTERVAL correctly or if this creates a SQL injection vector.
+3. WIN RATE CALCULATION: In feedback.py line 85, for short signals, the condition checks ret > 0. The comment says close_return_pips is direction-adjusted in measurement. Verify against opportunity/measurement.py whether returns are actually direction-adjusted. If not, short trades with positive raw returns would be counted as wins when they are actually losses.
+4. CALIBRATION DRIFT BOUNDS: calibration_drift = avg_conf - win_rate. If avg_conf=0.70 and win_rate=0.40, drift=0.30. Kelly adjustment (line 100): kelly = max(0.05, 0.15 - 0.5*(0.30-0.05)) = max(0.05, 0.15-0.125) = max(0.05, 0.025) = 0.05. Verify all boundary conditions and that parameters never go negative or exceed reasonable limits.
+5. SLIPPAGE JOIN CORRECTNESS: The slippage calculation (lines 121-130) joins live_trades on entry_time::date = trade_date. This assumes one trade per day per instrument. Is that guaranteed by the system? What if multiple entries happen intraday?
+6. PARAMETER PERSISTENCE: Adjusted parameters go to Redis and PostgreSQL. If Redis is down, the live_trader uses stale defaults. Are the PostgreSQL values ever read back as fallback? What is the startup behavior?
+7. TEST COVERAGE: Evaluate test_closed_loop.py for coverage gaps. Are edge cases tested: zero trades, all losses, NaN returns, extreme drift values, Redis connection failures?
+8. LOOKBACK WINDOW: The default 20-day lookback for learning. For a daily FX strategy with ~5 trades per month, this means adapting on ~5 samples. Is this statistically meaningful? Could noise cause harmful parameter drift?
+9. DEAD CODE: In feedback.py lines 114-118, there is a loop building expected_prices by date that contains only 'pass'. Is this dead code? Does it affect the slippage calculation path?
+10. EVENT EXTRACTOR: How does the extractor determine confidence and direction? Does it correctly handle the case where composite_result is empty or malformed?
+
+Output a structured report with severity ratings, stability analysis, and recommendations. Save your full report as docs/audit_agent5_closed_loop.md

@@ -1,0 +1,16 @@
+# third-party vendored repo (clone it: see forecasting/README.md)
+vendor/
+
+# market data & derived outputs — Databento-licensed, never publish
+data/
+*.parquet
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# logs / scratch
+*.log
