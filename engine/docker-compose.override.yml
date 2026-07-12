@@ -1,0 +1,8 @@
+# Local override: jesse_postgres (another project) owns host port 5432,
+# so quant_postgres maps to 5433 on the host. In-network services still
+# reach it as postgres:5432; host-side tools use localhost:5433
+# (QUANT_DB_URL / DATABASE_URL).
+services:
+  postgres:
+    ports: !override
+      - "5433:5432"

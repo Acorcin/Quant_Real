@@ -160,6 +160,12 @@ def main():
     ap.add_argument("--features-out", default="",
                     help="write per-origin XGBoost features parquet here "
                          "(default: <real-data stem>_features.parquet)")
+    ap.add_argument("--persist", action="store_true",
+                    help="land the run in the md Postgres schema (bars, "
+                         "conditioned series, forecast archive, gate signals, "
+                         "features) under one run_id; needs psycopg2 and "
+                         "QUANT_DB_URL/DATABASE_URL (defaults to the engine's "
+                         "docker-compose Postgres)")
     args = ap.parse_args()
 
     real = None
@@ -181,12 +187,27 @@ def main():
     else:
         series = SYNTH[args.synthetic](n=args.n)
 
-    run_pipeline(series, horizon=args.horizon, min_train=args.min_train,
-                 include_foundation=not args.no_foundation, step=args.step,
-                 real=real, features_out=args.features_out,
-                 backend=args.backend, context_length=args.context_length,
-                 num_paths=args.num_paths, kronos_model=args.kronos_model,
-                 kronos_tokenizer=args.kronos_tokenizer)
+    result = run_pipeline(series, horizon=args.horizon, min_train=args.min_train,
+                          include_foundation=not args.no_foundation,
+                          step=args.step, real=real,
+                          features_out=args.features_out,
+                          backend=args.backend,
+                          context_length=args.context_length,
+                          num_paths=args.num_paths,
+                          kronos_model=args.kronos_model,
+                          kronos_tokenizer=args.kronos_tokenizer)
+
+    if args.persist:
+        if real is None:
+            print("[persist] skipped: --persist only applies to --real-data runs")
+        else:
+            from . import persist as persistmod
+            run_id = persistmod.persist_run(
+                result, real, source_file=args.real_data,
+                config={k: v for k, v in vars(args).items()
+                        if k not in ("persist",)})
+            print(f"[persist] run {run_id} landed in md schema "
+                  f"({persistmod.resolve_dsn().rsplit('@', 1)[-1]})")
 
 
 if __name__ == "__main__":
