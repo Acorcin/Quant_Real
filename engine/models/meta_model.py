@@ -199,6 +199,7 @@ class MetaModel:
         sample_dates: list[date] | None = None,
         instrument: str | None = None,
         allow_synthetic_return_proxy: bool = False,
+        sample_returns: np.ndarray | None = None,
     ) -> dict:
         """
         Train the XGBoost model on historical feature vectors.
@@ -211,6 +212,10 @@ class MetaModel:
             instrument: e.g. EUR_USD; used with sample_dates to load bar returns.
             allow_synthetic_return_proxy: Allow CPCV to fall back to fixed ±0.1% returns
                 when realized bar returns are unavailable. Defaults to False.
+            sample_returns: Precomputed realized next-period returns aligned to
+                feature_vectors (one per row). When given, CPCV uses these
+                directly instead of looking up daily bars — the path for
+                intraday/CME series whose returns don't live in the bars table.
 
         Returns:
             Training results dict with CPCV validation and clearly labeled in-sample fit.
@@ -233,10 +238,14 @@ class MetaModel:
 
         if sample_dates is not None and len(sample_dates) != len(feature_vectors):
             raise ValueError("sample_dates must match feature_vectors length when provided")
-        if (sample_dates is None or not instrument) and not allow_synthetic_return_proxy:
+        if sample_returns is not None and len(sample_returns) != len(feature_vectors):
+            raise ValueError("sample_returns must match feature_vectors length when provided")
+        if (sample_returns is None and (sample_dates is None or not instrument)
+                and not allow_synthetic_return_proxy):
             raise ValueError(
-                "CPCV requires sample_dates + instrument for realized returns. "
-                "Pass allow_synthetic_return_proxy=True to use the simplified fallback."
+                "CPCV requires sample_returns, or sample_dates + instrument for "
+                "realized returns. Pass allow_synthetic_return_proxy=True to use "
+                "the simplified fallback."
             )
 
         self.scaler = StandardScaler()
@@ -253,6 +262,7 @@ class MetaModel:
             sample_dates=sample_dates,
             instrument=instrument,
             allow_synthetic_return_proxy=allow_synthetic_return_proxy,
+            sample_returns=sample_returns,
         )
 
         # Detect GPU availability for XGBoost acceleration
@@ -420,6 +430,7 @@ class MetaModel:
         sample_dates: list[date] | None = None,
         instrument: str | None = None,
         allow_synthetic_return_proxy: bool = False,
+        sample_returns: np.ndarray | None = None,
     ) -> dict:
         """
         Purged Combinatorial Cross-Validation.
@@ -432,7 +443,9 @@ class MetaModel:
 
         n = len(X)
         returns_all = None
-        if sample_dates is not None and instrument:
+        if sample_returns is not None:
+            returns_all = np.asarray(sample_returns, dtype=float)
+        elif sample_dates is not None and instrument:
             returns_all = _next_trading_day_pct_returns(instrument, sample_dates)
             if returns_all is None or np.all(np.isnan(returns_all)):
                 returns_all = None
