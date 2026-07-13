@@ -45,6 +45,13 @@ DATABASE_URL = (
 INSTRUMENTS = ["EUR_USD", "GBP_USD", "USD_JPY"]
 PRIMARY_INSTRUMENT = "EUR_USD"
 
+# ─── Kronos bridge ────────────────────────────────────────
+# The md-schema series that feeds the engine's foundation-model features.
+# During the FX→CME transition this differs from PRIMARY_INSTRUMENT (which is
+# still the FX symbol), so it is configured separately. Defaults to the CME
+# micro-EUR front month the forecasting pipeline has been persisting.
+KRONOS_INSTRUMENT = os.environ.get("KRONOS_INSTRUMENT", "M6EH6")
+
 # ─── FRED Series IDs ─────────────────────────────────────
 FRED_US_2Y_SERIES = "DGS2"          # US 2-Year Treasury yield
 FRED_DE_2Y_SERIES = "IRLTLT01DEM156N" # Proxy — using Long-Term Interest Rate for Germany instead of missing 2Y

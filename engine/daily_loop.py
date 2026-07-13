@@ -273,11 +273,21 @@ def main():
         regime_result = {"state_id": 1, "state_label": "high_vol_choppy", "confidence": 0.33, "days_in_regime": 0}
         errors["regime"] = str(e)
 
+    # Step 8b: Load Kronos foundation-model features from the md schema
+    # (populated by forecasting/run.py --persist). One point-in-time read,
+    # threaded into both the Tier-1 directional signal and the feature vector.
+    logger.info("─── Step 8b: Loading Kronos bridge features ───")
+    from features.kronos_bridge import load_latest_kronos
+    from config.settings import KRONOS_INSTRUMENT
+    kronos_features = load_latest_kronos(KRONOS_INSTRUMENT)
+    steps["kronos_bridge"] = kronos_features is not None
+
     # Step 9: Generate Tier 1 + Tier 2 Signals
     logger.info("─── Step 9: Generating signals ───")
     try:
         tier1_signals = generate_all_tier1(
-            today, PRIMARY_INSTRUMENT, regime_result.get("state_id", 1), technical_result
+            today, PRIMARY_INSTRUMENT, regime_result.get("state_id", 1),
+            technical_result, kronos=kronos_features
         )
 
         # Determine proposed direction from Tier 1 for Tier 2 confirmation
@@ -303,7 +313,8 @@ def main():
     logger.info("─── Step 10: Assembling feature vector ───")
     try:
         feature_vector = assemble_feature_vector(
-            today, PRIMARY_INSTRUMENT, technical_result, regime_result, composite_result
+            today, PRIMARY_INSTRUMENT, technical_result, regime_result,
+            composite_result, kronos=kronos_features
         )
         store_feature_vector(today, PRIMARY_INSTRUMENT, feature_vector)
         steps["feature_vector"] = True
