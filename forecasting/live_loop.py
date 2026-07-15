@@ -39,7 +39,11 @@ from . import persist as persistmod
 
 logger = logging.getLogger("live_loop")
 
-MAX_WINDOW = timedelta(minutes=30)
+MAX_WINDOW = timedelta(minutes=30)        # near-real-time: same-day get_range
+                                          # 504s beyond ~30 min
+CATCHUP_WINDOW = timedelta(hours=4)       # backlog is historical/fully
+                                          # processed — pull big chunks
+CATCHUP_AFTER = timedelta(hours=2)        # "old enough to be historical"
 
 
 class LiveForecaster:
@@ -150,9 +154,12 @@ class LiveForecaster:
             if wm.tzinfo is None:
                 wm = wm.tz_localize("UTC")
 
-            end = datetime.now(timezone.utc) - AVAILABILITY_LAG
-            if end - wm > MAX_WINDOW:
-                end = wm + MAX_WINDOW
+            now = datetime.now(timezone.utc)
+            end = now - AVAILABILITY_LAG
+            # adaptive chunk: big for historical backlog, small near real-time
+            cap = (CATCHUP_WINDOW if (now - wm) > CATCHUP_AFTER else MAX_WINDOW)
+            if end - wm > cap:
+                end = wm + cap
             if wm >= end:
                 return {"status": "idle", "reason": "no new window"}
 
@@ -305,6 +312,14 @@ def main():
     ap.add_argument("--loop", type=int, default=0, metavar="SECONDS")
     ap.add_argument("--once", action="store_true")
     args = ap.parse_args()
+
+    if args.loop:
+        from .singleton import acquire, AlreadyRunning
+        try:
+            acquire(f"live_loop_{args.instrument}")
+        except AlreadyRunning as e:
+            logger.error(str(e))
+            raise SystemExit(1)
 
     lf = LiveForecaster(args.symbol, args.instrument, bar_size=args.bar_size)
     if args.loop:

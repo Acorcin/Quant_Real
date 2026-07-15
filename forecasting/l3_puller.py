@@ -427,6 +427,14 @@ def main():
                     help="don't keep raw DBN increments in the lake")
     args = ap.parse_args()
 
+    if args.loop:
+        from .singleton import acquire, AlreadyRunning
+        try:
+            acquire(f"l3_puller_{args.symbol}")
+        except AlreadyRunning as e:
+            logger.error(str(e))
+            raise SystemExit(1)
+
     p = L3Poller(args.symbol, schema=args.schema,
                  vpin_bucket=args.vpin_bucket, keep_raw=not args.no_raw)
     if args.loop:
