@@ -136,13 +136,15 @@ CREATE TABLE IF NOT EXISTS md.kronos_features (
 -- Engine-facing view: latest run per instrument, engine feature names.
 -- (engine reads kronos_p50_scaled / kronos_uncertainty / kronos_context_vol /
 --  kronos_regime_encoded; efficient=0 drives the structural veto)
+--
+-- ONE row per instrument: the single FRESHEST forecast (by ts) across all
+-- runs that actually carry one. Deliberately NOT "latest run by started_at" —
+-- a later stat-only / backfill run (NULL forecasts) must never hijack the
+-- bridge, and a consumer must never see a stale origin. This is the row the
+-- engine and mission-control act on right now.
 CREATE OR REPLACE VIEW md.v_engine_features AS
-WITH latest AS (
-    SELECT DISTINCT ON (instrument) run_id, instrument
-    FROM md.runs ORDER BY instrument, started_at DESC
-)
-SELECT
-    l.instrument,
+SELECT DISTINCT ON (r.instrument)
+    r.instrument,
     k.ts,
     k.kronos_p50_scaled,
     k.kronos_spread_scaled                    AS kronos_uncertainty,
@@ -155,4 +157,6 @@ SELECT
     k.run_id,
     k.origin_seq
 FROM md.kronos_features k
-JOIN latest l USING (run_id);
+JOIN md.runs r USING (run_id)
+WHERE k.kronos_p50_scaled IS NOT NULL
+ORDER BY r.instrument, k.ts DESC;

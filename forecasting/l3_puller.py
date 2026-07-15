@@ -47,9 +47,10 @@ AVAILABILITY_LAG = timedelta(minutes=20)   # historical availability buffer:
                                            # ~now-15min, so stay clear of it
 SAMPLE_EVERY = timedelta(seconds=1)        # book-state sampling (event time)
 COST_ABORT_USD = 0.01                      # hard guard: pulls must be ~free
-MAX_WINDOW = timedelta(minutes=30)         # per-poll cap: same-day get_range
-                                           # 504s beyond ~30min windows; the
-                                           # loop catches up chunk by chunk
+MAX_WINDOW = timedelta(minutes=30)         # per-poll cap near real-time
+CATCHUP_WINDOW = timedelta(hours=2)        # bigger chunks when far behind
+                                           # (M6E mbp-1 is thin; no 504s)
+CATCHUP_AFTER = timedelta(hours=2)
 DATASET = "GLBX.MDP3"
 LAKE = Path(__file__).resolve().parents[1] / "data" / "lake"
 
@@ -251,8 +252,11 @@ class L3Poller:
                 start = wm
             if start >= end:
                 return {"status": "empty", "reason": "window not yet available"}
-            if end - start > MAX_WINDOW:
-                end = start + MAX_WINDOW    # chunk; next poll continues
+            # adaptive chunk: big when far behind (historical backlog), small
+            # near real-time where same-day get_range is flaky
+            cap = (CATCHUP_WINDOW if (now - start) > CATCHUP_AFTER else MAX_WINDOW)
+            if end - start > cap:
+                end = start + cap           # chunk; next poll continues
 
             cli = self._cli()
             kw = dict(dataset=DATASET, symbols=[self.symbol],
