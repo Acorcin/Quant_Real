@@ -50,7 +50,7 @@ PRIMARY_INSTRUMENT = "EUR_USD"
 # During the FX→CME transition this differs from PRIMARY_INSTRUMENT (which is
 # still the FX symbol), so it is configured separately. Defaults to the CME
 # micro-EUR front month the forecasting pipeline has been persisting.
-KRONOS_INSTRUMENT = os.environ.get("KRONOS_INSTRUMENT", "M6EH6")
+KRONOS_INSTRUMENT = os.environ.get("KRONOS_INSTRUMENT", "M6EU6")
 
 # L3 microstructure series: the intraday puller's PARENT symbol (md.v_l3_latest
 # is keyed by it, e.g. "M6E.FUT" / "ES.FUT") — not the md series name above.
