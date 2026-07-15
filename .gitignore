@@ -14,3 +14,4 @@ venv/
 
 # logs / scratch
 *.log
+data/lake/

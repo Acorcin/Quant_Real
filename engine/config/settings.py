@@ -52,6 +52,10 @@ PRIMARY_INSTRUMENT = "EUR_USD"
 # micro-EUR front month the forecasting pipeline has been persisting.
 KRONOS_INSTRUMENT = os.environ.get("KRONOS_INSTRUMENT", "M6EH6")
 
+# L3 microstructure series: the intraday puller's PARENT symbol (md.v_l3_latest
+# is keyed by it, e.g. "M6E.FUT" / "ES.FUT") — not the md series name above.
+L3_INSTRUMENT = os.environ.get("L3_INSTRUMENT", "M6E.FUT")
+
 # ─── FRED Series IDs ─────────────────────────────────────
 FRED_US_2Y_SERIES = "DGS2"          # US 2-Year Treasury yield
 FRED_DE_2Y_SERIES = "IRLTLT01DEM156N" # Proxy — using Long-Term Interest Rate for Germany instead of missing 2Y

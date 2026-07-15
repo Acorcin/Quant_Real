@@ -277,10 +277,13 @@ def main():
     # (populated by forecasting/run.py --persist). One point-in-time read,
     # threaded into both the Tier-1 directional signal and the feature vector.
     logger.info("─── Step 8b: Loading Kronos bridge features ───")
-    from features.kronos_bridge import load_latest_kronos
-    from config.settings import KRONOS_INSTRUMENT
+    from features.kronos_bridge import load_latest_kronos, load_latest_l3
+    from config.settings import KRONOS_INSTRUMENT, L3_INSTRUMENT
     kronos_features = load_latest_kronos(KRONOS_INSTRUMENT)
     steps["kronos_bridge"] = kronos_features is not None
+    # L3 microstructure (imbalance/VPIN) from the intraday MBP-1 puller
+    l3_features = load_latest_l3(L3_INSTRUMENT)
+    steps["l3_bridge"] = l3_features is not None
 
     # Step 9: Generate Tier 1 + Tier 2 Signals
     logger.info("─── Step 9: Generating signals ───")
@@ -314,7 +317,7 @@ def main():
     try:
         feature_vector = assemble_feature_vector(
             today, PRIMARY_INSTRUMENT, technical_result, regime_result,
-            composite_result, kronos=kronos_features
+            composite_result, kronos=kronos_features, l3=l3_features
         )
         store_feature_vector(today, PRIMARY_INSTRUMENT, feature_vector)
         steps["feature_vector"] = True

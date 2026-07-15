@@ -107,6 +107,37 @@ def load_latest_kronos(instrument: str) -> dict | None:
     return kronos
 
 
+_LATEST_L3_SQL = """
+    SELECT l3_order_book_imbalance, l3_vpin, book_ts
+    FROM md.v_l3_latest
+    WHERE instrument = %s
+"""
+
+
+def load_latest_l3(instrument: str) -> dict | None:
+    """Latest microstructure features from the L3 puller (md.v_l3_latest):
+    {order_book_imbalance, vpin} — the shape assemble_feature_vector(l3=...)
+    expects. `instrument` here is the puller's parent symbol (e.g. "M6E.FUT",
+    "ES.FUT"), not the md series name. None (graceful) when the puller hasn't
+    run or the DB is unreachable."""
+    try:
+        from models.database import fetch_one
+        row = fetch_one(_LATEST_L3_SQL, (instrument,))
+    except Exception as e:
+        logger.warning("L3 bridge unavailable (%s); l3 features stay 0", e)
+        return None
+    if not row or row.get("l3_order_book_imbalance") is None:
+        logger.info("No L3 state in md for %s yet — l3 features stay 0",
+                    instrument)
+        return None
+    l3 = {"order_book_imbalance": _f(row["l3_order_book_imbalance"]),
+          "vpin": _f(row.get("l3_vpin"))}
+    logger.info("L3 bridge %s: imbalance=%+.4f vpin=%.4f (book %s)",
+                instrument, l3["order_book_imbalance"], l3["vpin"],
+                row.get("book_ts"))
+    return l3
+
+
 def _f(x) -> float:
     try:
         return float(x)

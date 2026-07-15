@@ -41,13 +41,13 @@ def _connect(dsn: str):
 
 
 def apply_schema(dsn: str = "") -> None:
-    """Apply forecasting/sql/schema_market.sql (idempotent)."""
+    """Apply every forecasting/sql/*.sql migration, sorted (all idempotent)."""
     from pathlib import Path
-    sql = (Path(__file__).parent / "sql" / "schema_market.sql").read_text()
     conn = _connect(resolve_dsn(dsn))
     try:
         with conn.cursor() as cur:
-            cur.execute(sql)
+            for f in sorted((Path(__file__).parent / "sql").glob("*.sql")):
+                cur.execute(f.read_text())
         conn.commit()
     finally:
         conn.close()
