@@ -1,0 +1,95 @@
+# ============================================================================
+# Quant_Real containerized stack.
+#
+#   docker compose up -d                 # postgres + all data feeds
+#   docker compose --profile trade up -d # ... plus the demo trading loop
+#   docker compose logs -f live_loop
+#   docker compose down                  # stop (volume/data survive)
+#
+# Reuses the EXISTING engine_pgdata volume — all md history carries over.
+# Supersedes engine/docker-compose.yml (whose FX-era physics-engine /
+# live-trader services are deprecated; stop that stack before `up` so the
+# 5433 port binding is free).
+#
+# Secrets come from ./.env (git-ignored; see .env.example).
+# Kill switch: create data/KILL on the host -> demo_loop flattens and stops.
+# ============================================================================
+
+x-app: &app
+  build: .
+  image: quant-real:latest
+  env_file: .env
+  environment:
+    QUANT_DB_URL: postgresql://postgres:postgres@postgres:5432/quant_eod
+    DB_HOST: postgres
+    DB_PORT: "5432"
+    DB_NAME: quant_eod
+    DB_USER: postgres
+    DB_PASSWORD: postgres
+    MODELDIR: /app/model_artifacts
+    QUANT_LOCK_DIR: /tmp/locks
+  volumes:
+    - ./data:/app/data            # lake, seed parquets, KILL switch
+    - hf_cache:/hf                # HuggingFace weights (Kronos) persist
+    - model_artifacts:/app/model_artifacts
+  depends_on:
+    postgres:
+      condition: service_healthy
+    bootstrap:
+      condition: service_completed_successfully
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: quant_real_postgres
+    environment:
+      POSTGRES_DB: quant_eod
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"               # host tools keep using localhost:5433
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d quant_eod"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  bootstrap:
+    <<: *app
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["python", "bootstrap.py"]
+
+  live_loop:
+    <<: *app
+    command: ["python", "-m", "forecasting.live_loop",
+              "--symbol", "M6E.FUT", "--instrument", "M6EU6", "--loop", "60"]
+
+  l3_puller:
+    <<: *app
+    command: ["python", "-m", "forecasting.l3_puller",
+              "--symbol", "M6E.FUT", "--vpin-bucket", "100", "--loop", "300"]
+
+  physics_feed:
+    <<: *app
+    command: ["python", "-m", "forecasting.physics_feed",
+              "--symbol", "M6E.FUT", "--instrument", "M6EU6", "--loop", "60"]
+
+  demo_loop:
+    <<: *app
+    profiles: ["trade"]           # opt-in: compose --profile trade up
+    working_dir: /app/engine
+    command: ["python", "demo_loop.py", "--loop", "60"]
+
+volumes:
+  pgdata:
+    name: engine_pgdata           # the existing volume — md history carries over
+    external: true
+  hf_cache:
+  model_artifacts:

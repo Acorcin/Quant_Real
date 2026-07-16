@@ -15,3 +15,6 @@ venv/
 # logs / scratch
 *.log
 data/lake/
+
+# secrets for docker compose
+.env

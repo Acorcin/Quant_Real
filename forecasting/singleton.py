@@ -17,7 +17,12 @@ import atexit
 import os
 from pathlib import Path
 
-_LOCK_DIR = Path(__file__).resolve().parents[1] / "data" / "locks"
+# Overridable so containers use a container-local dir: PID liveness checks
+# don't survive PID-namespace boundaries, so host and container must not
+# share a lock directory (QUANT_LOCK_DIR=/tmp/locks in docker-compose).
+_LOCK_DIR = Path(os.environ.get(
+    "QUANT_LOCK_DIR",
+    Path(__file__).resolve().parents[1] / "data" / "locks"))
 
 
 def _pid_alive(pid: int) -> bool:

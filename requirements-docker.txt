@@ -1,0 +1,34 @@
+# Consolidated runtime deps for the containerized stack (CPU-only).
+# torch is installed separately in the Dockerfile from the CPU wheel index —
+# the default PyPI linux wheel drags multi-GB CUDA libraries we don't want.
+
+# forecasting core
+numpy
+pandas
+scipy
+statsmodels
+arch
+hmmlearn
+pyarrow
+
+# data + persistence
+databento
+psycopg2-binary
+python-dotenv
+
+# foundation model (kronos vendor + chronos fallback)
+chronos-forecasting
+einops
+huggingface_hub
+safetensors
+tqdm
+
+# physics layer
+filterpy
+psutil
+
+# engine (meta-model + tradovate)
+xgboost
+scikit-learn
+joblib
+requests
