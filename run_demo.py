@@ -45,6 +45,9 @@ def specs(mechanics: bool):
         ("live_loop", ROOT,
          [PY, "-m", "forecasting.live_loop", "--symbol", "M6E.FUT",
           "--instrument", "M6EU6", "--loop", "60"]),
+        ("physics_feed", ROOT,
+         [PY, "-m", "forecasting.physics_feed", "--symbol", "M6E.FUT",
+          "--instrument", "M6EU6", "--loop", "60"]),
         ("demo_loop", ROOT / "engine", demo),
     ]
 

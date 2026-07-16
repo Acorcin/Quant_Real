@@ -64,10 +64,14 @@ class PhysicsEngine:
         normalized_return = tick_return / atr_val
         
         # 7. Regime-Aware Z-Clip
+        # FX-era HMM labels plus the Quant_Real characterization vocabulary
+        # (calm/turbulent from md.characterizations regimes).
         clip_thresholds = {
             "low_vol":          (-2.5, 2.5),
             "high_vol_choppy":  (-3.5, 3.5),
             "high_vol_crash":   (-5.0, 5.0),
+            "calm":             (-2.5, 2.5),
+            "turbulent":        (-3.5, 3.5),
         }
         
         limits = clip_thresholds.get(regime_label, (-3.5, 3.5))
@@ -89,6 +93,19 @@ class PhysicsEngine:
             "dt": dt
         }
         
+    def process_trade(self, price: float, timestamp: float,
+                      regime_label: str = "turbulent",
+                      daily_scale: float = 0.005) -> dict:
+        """Condition a single executed-trade tick (CME futures path).
+
+        Trades have one price, not bid/ask — the mid IS the trade price.
+        `daily_scale` plays the old daily-ATR role: an absolute daily price
+        move scale used to normalize tick returns (derived upstream from the
+        md conditioned series, not from FX ATR)."""
+        return self.process_tick(price, price, timestamp,
+                                 regime_label=regime_label,
+                                 daily_atr=daily_scale)
+
     def get_state(self) -> dict:
         """Get the full serialized state of the engine for database or Redis storage."""
         return {
